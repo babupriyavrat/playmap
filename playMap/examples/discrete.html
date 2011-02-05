@@ -1,0 +1,284 @@
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+
+    <title>Play Map Test</title>
+
+    <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/themes/smoothness/jquery-ui.css" type="text/css" media="all" />
+    <style type="text/css">
+        body { height: 100%; margin: 0px; padding: 10px; }
+        #map_canvas { height: 600px; width: 700px; }
+        #options { height: 600px; width: 200px; }
+        #options > div { margin: 10px; padding: 10px; border: 1px grey solid; }
+        #options p { margin: 10px 0px; }
+    </style>
+
+    <style>
+        #toolbar {
+                padding: 10px 4px;
+        }
+    </style>
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.0/jquery-ui.min.js"></script>
+
+    <!-- Google Maps API javascript -->
+    <script type="text/javascript" src="http://maps.google.com/maps/api/js?libraries=geometry&sensor=false"></script>
+
+    <script type="text/javascript" src="playMap.js"></script>
+
+    <!-- Initialize visualization -->
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+        google.load('visualization', '1', {});
+    </script>
+
+  </head>
+
+<body>
+
+    <!-- RECOMMENDED if your web app will not function without JavaScript enabled -->
+    <noscript>
+      <div style="width: 22em; position: absolute; left: 50%; margin-left: -11em; color: red; background-color: white; border: 1px solid red; padding: 4px; font-family: sans-serif">
+        Your web browser must have JavaScript enabled
+        in order for this application to display correctly.
+      </div>
+    </noscript>
+
+    <p>Discrete PlayMap<a href="./continuous.php" target="_top" style="float:right;">Go To Continuous PlayMap</a></p>
+    <p>This example demonstrates the use of PlayMap with a Discrete player, that is to stay a date by date display of
+        geographical information data.
+        You can customise the appearance of your data on the map by specifying display options for each channels or for all.
+        You can specify whether the data is loaded at start or for each step
+    </p>
+
+    <table>
+        <tr>
+            <td><div id="map_canvas"></div></td>
+            <td>
+                <div id="options">
+                    <div><p>Select Example:</p><select id="example"></select></div>
+                    <div><p>Tolerance is a feature allowing you to specify if which data need displaying. Any data within the current date +/- the tolerance is displayed.</p><input type="text" id="tolerance" placeholder="Enter a Duration"/></div>
+                    <div><ul id="entityList"></ul></div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="demo">
+
+        <span id="toolbar" class="ui-widget-header ui-corner-all">
+                <button id="beginning">go to beginning</button>
+                <button id="back">back</button>
+                <button id="forward">forward</button>
+                <button id="end">go to end</button>
+
+                <select id="time" />
+        </span>
+
+    </div><!-- End demo -->
+
+<div class="demo-description">
+<p>
+	A mediaplayer toolbar, code from <a href="http://jqueryui.com/demos/button/#toolbar">JQuery UI</a>.
+        Used to demonstrate the different scenarios possible with PlayMap. The UI could be completely different.
+        PlayMap does not provide the UI (buttons) but provides the functionality for map animations that can be triggered by a UI.
+        To implement different UIs check the example code below that provides the UI for this page.
+</p>
+</div><!-- End demo-description -->
+
+<script type="text/javascript">
+
+    var tableid = 297050; //the table id
+    var map;
+    var geocoder;
+    var lastWindow;
+    var playMapWidget;
+
+    var examples = {
+        "Density Bar Chart": runBarChartDensity
+    }
+
+    $('document').ready(initialize);
+
+    /* INITIALIZE - initialize the map and geocoder */
+
+    function initialize() {
+
+            var beginning = $( "#beginning" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-start"
+                    }
+            });
+            var rewind = $( "#back" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-prev"
+                    }
+            });
+            var stop = $( "#stop" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-stop"
+                    }
+            });
+            var forward = $( "#forward" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-next"
+                    }
+            });
+            var end = $( "#end" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-end"
+                    }
+            });
+            var time = $("#time");
+
+            function getOptions() {
+                return {
+                };
+            }
+
+            map = new google.maps.Map(document.getElementById('map_canvas'), {
+                      center: new google.maps.LatLng(37.4, -122.1), //the center lat and long
+                      zoom: 10, //zoom
+                      mapTypeId: google.maps.MapTypeId.ROADMAP //the map style
+                    });
+
+            geocoder = new google.maps.Geocoder();
+
+            // test 1 with continuous move of markers
+            // a play/pause, accelerate and stop button
+            // a checkbox for displaying traces and extrapolating positions
+            playMapWidget = new playMap.DiscretePlayMap(map, getOptions());
+            function getExample() {
+                return $('#example').find('option:selected').val();
+            }
+            for(var exampleName in examples) {
+                $('<option value="' + exampleName + '">' + exampleName + '</option>').appendTo($('#example'));
+            }
+            runExample(getExample());
+            var entityList = $('ul#entityList');
+            playMapWidget.addEventListener(playMap.events.dataReady, function() {
+                entityList.empty();
+                var entities = playMapWidget.getEntities();
+                var entityName;
+                var entity;
+                for(entityName in entities) {
+                    entity = entities[entityName];
+                    var item = $('<li><input type="checkbox" checked="checked" name="' + entityName + '" />' + entityName + '</li>').appendTo(entityList);
+                    item.find('input').change(function() {
+                        var checked = $(this).is(':checked');
+                        var name = $(this).attr("name");
+                        playMapWidget.setEntityVisibility(checked, name);
+                    });
+                }
+            });
+    }
+
+    function getOptions() {
+        return {
+            type: {type: "genericOverlay", options: {image: './books.png'}}
+        };
+    }
+
+    function runExample(example) {
+        playMapWidget.cleanUp();
+        (examples[example] || function(){})();
+    }
+
+    // displays the bar chart of the US population density
+    function runBarChartDensity() {
+        var times = ['7/1/2008', '7/1/2007', '7/1/2006', '7/1/2005', '7/1/2004', '7/1/2003'];
+        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT 'Geographic Area', '" + times.join("', '") + "' FROM 58510"));
+        query.send(function(response) {
+                var options = getOptions();
+                options.type = {type: "barChart",
+                                options: {
+                                    color: '#faa',
+                                    height: function(data) {return data[3] / 301290332 * 150;}
+                                }};
+                  var numRows = response.getDataTable().getNumberOfRows();
+                  var numCols = response.getDataTable().getNumberOfColumns();
+
+                  var data = [];
+                  var geocodeCounter = numRows;
+                  //create an array of row values
+                  for (i = 0; i < numRows; i++) {
+                    var addressName = response.getDataTable().getValue(i, 0);
+                    var indexValue = i;
+                    geocode(addressName, indexValue, function(results, status, address, index) {
+                        var density, coordinate, time;
+                        geocodeCounter--;
+                        if (status == google.maps.GeocoderStatus.OK) {
+                            coordinate = results[0].geometry.location;
+                            for (j = 1; j < numCols; j++) {
+                                density = response.getDataTable().getValue(index, j);
+                                data.push([address, coordinate, new Date(times[j - 1]), density]);
+                            }
+                            // all data has been geocoded, pushData to the PlayMap widget
+                            if(geocodeCounter == 0) {
+                                playMapWidget.pushData(0, data, 2, 1, options);
+                                // show the discrete time values in the select box
+                                var select = $('select#time');
+                                $.each(times, function(i, item) {
+                                    $('<option value="' + new Date(item).getTime() + '">' + item + '</option>').appendTo(select);
+                                });
+                                select.change(function() {
+                                    playMapWidget.setCurrentTime(select.find('option:selected').val());
+                                });
+                            }
+                        }
+                    });
+                  }
+            });
+    }
+
+    function geocode(address, index, callback) {
+        geocoder.geocode( { 'address': address }, function(results, status) {callback(results, status, address, index);});
+    }
+
+    /* GVIZ - get data from Fusion Tables */
+
+    //define callback function, this is called when the results are returned
+    function pushFTData(response, timeIndex, geometryIndex, entityIndex, options, geocoded) {
+
+      //for more information on the response object, see the documentation
+      //http://code.google.com/apis/visualization/documentation/reference.html#QueryResponse
+      var numRows = response.getDataTable().getNumberOfRows();
+      var numCols = response.getDataTable().getNumberOfColumns();
+
+      var data = [];
+      //create an array of row values
+      for (i = 0; i < numRows; i++) {
+        var row = [];
+        for (j = 0; j < numCols; j++) {
+          row.push(response.getDataTable().getValue(i, j));
+        }
+        if(!geocoded) {
+            geocodeRow(row, geometryIndex);
+        }
+        data.push(row);
+      }
+      playMapWidget.pushData(entityIndex, data, timeIndex, geometryIndex, options);
+    }
+
+    /* GEOCODING - geocode data in Fusion Tables, if the data is a String Address */
+
+    //geocode the address
+    function geocodeRow(row, geometryIndex) {
+      geocoder.geocode( { 'address': row[geometryIndex] }, function(results, status) {
+        if (status == google.maps.GeocoderStatus.OK) {
+          var coordinate = results[0].geometry.location;
+          row[geometryIndex] = coordinate;
+        }
+      });
+    }
+
+ </script>
+
+  </body>
+</html>

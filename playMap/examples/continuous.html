@@ -1,0 +1,364 @@
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+
+    <title>Continuous Play Map Test</title>
+
+    <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/themes/smoothness/jquery-ui.css" type="text/css" media="all" />
+    <style type="text/css">
+        body { height: 100%; margin: 0px; padding: 10px; }
+        #map_canvas { height: 400px; width: 700px; }
+        #options { height: 400px; width: 200px; }
+        #options > div { margin: 10px; padding: 10px; border: 1px grey solid; }
+        #options p { margin: 10px 0px; }
+    </style>
+
+    <style>
+        #toolbar {
+                padding: 10px 4px;
+        }
+    </style>
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.0/jquery-ui.min.js"></script>
+
+    <!-- Google Maps API javascript -->
+    <script type="text/javascript" src="http://maps.google.com/maps/api/js?libraries=geometry&sensor=false"></script>
+    <script type="text/javascript" src="playMap.js"></script>
+
+    <!-- Initialize visualization -->
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+        google.load('visualization', '1', {});
+    </script>
+
+  </head>
+
+<body>
+
+    <!-- RECOMMENDED if your web app will not function without JavaScript enabled -->
+    <noscript>
+      <div style="width: 22em; position: absolute; left: 50%; margin-left: -11em; color: red; background-color: white; border: 1px solid red; padding: 4px; font-family: sans-serif">
+        Your web browser must have JavaScript enabled
+        in order for this application to display correctly.
+      </div>
+    </noscript>
+
+    <p>Continuous PlayMap<a href="./discrete.php" target="_top" style="float:right;">Go To Discrete PlayMap</a></p>
+    <p>This example demonstrates the use of PlayMap with a Continuous player, that is to stay a continuous timed refresh of
+        geographical information data. Continuous Play Map can be run on either live or replay, similar to a video and video feed.
+        Information is passed to the widget as a table of values, specify which index is the time column, and the geometry column
+        Use pushEntityData to specify data and display Options on an entity by entity level
+        Use pushRawData to create on the fly entities by specifying the entity column in the table
+        You can customise the appearance of your data on the map by specifying display options for each channels or for all.
+    </p>
+
+    <table>
+        <tr>
+            <td><div id="map_canvas"></div></td>
+            <td>
+                <div id="options">
+                    <div><p>Select Example:</p><select id="example"></select></div>
+                    <div><input type="checkbox" id="interpolated"/>Interpolated</div>
+                    <div><input type="checkbox" id="trace"/>With trace</div>
+                    <div><p>Trace size:</p><div id="slider"></div></div>
+                    <div><ul id="entityList"></ul></div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="demo">
+
+        <span id="toolbar" class="ui-widget-header ui-corner-all">
+                <button id="beginning">go to beginning</button>
+                <button id="rewind">rewind</button>
+                <button id="play">play</button>
+                <button id="stop">stop</button>
+                <button id="forward">fast forward</button>
+                <button id="end">go to end</button>
+
+                <span id="repeat">
+                        <input type="radio" id="repeat0" name="repeat" checked="checked" /><label for="repeat0">No Repeat</label>
+                        <input type="radio" id="repeat1" name="repeat" /><label for="repeat1">Once</label>
+                        <input type="radio" id="repeatall" name="repeat" /><label for="repeatall">All</label>
+                </span>
+
+                <label id="time"></label>
+        </span>
+
+    </div><!-- End demo -->
+
+<div class="demo-description">
+<p>
+	A mediaplayer toolbar, code from <a href="http://jqueryui.com/demos/button/#toolbar">JQuery UI</a>.
+        Used to demonstrate the different scenarios possible with PlayMap.
+</p>
+</div><!-- End demo-description -->
+
+<script type="text/javascript">
+
+    var tableid = 297050; //the table id
+    var map;
+    var geocoder;
+    var lastWindow;
+    var playMapWidget;
+    var examples = {
+        "Satellite Orbits Replay": runSatelliteOrbit,
+        "Boat Traffic Replay": runBoatsTraffic
+    }
+
+    $('document').ready(initialize);
+
+    /* INITIALIZE - initialize the map and geocoder */
+
+    function initialize() {
+
+            var beginning = $( "#beginning" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-start"
+                    }
+            });
+            var rewind = $( "#rewind" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-prev"
+                    }
+            });
+            var play = $( "#play" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-play"
+                    }
+            });
+            var stop = $( "#stop" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-stop"
+                    }
+            });
+            var forward = $( "#forward" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-next"
+                    }
+            });
+            var end = $( "#end" ).button({
+                    text: false,
+                    icons: {
+                            primary: "ui-icon-seek-end"
+                    }
+            });
+            var time = $("#time");
+            $( "#repeat" ).buttonset();
+            $( "#slider" ).slider();
+            var trace = $('#trace');
+            var interpolated = $('#interpolated');
+
+            map = new google.maps.Map(document.getElementById('map_canvas'), {
+                      center: new google.maps.LatLng(0.0, 0.0), //the center lat and long
+                      zoom: 3, //zoom
+                      mapTypeId: google.maps.MapTypeId.ROADMAP //the map style
+                    });
+
+            geocoder = new google.maps.Geocoder();
+
+            // test 1 with continuous move of markers
+            // a play/pause, accelerate and stop button
+            // a checkbox for displaying traces and extrapolating positions
+            playMapWidget = new playMap.ContinuousPlayMap(map, 1000.0);
+            var defaultIncrement = 24 * 3600 * 1000;
+            playMapWidget.setTimerIncrement(defaultIncrement);
+            play.click(function() {
+                    var options;
+                    if ( $( this ).text() === "play" ) {
+                            options = {
+                                    label: "pause",
+                                    icons: {
+                                            primary: "ui-icon-pause"
+                                    }
+                            };
+                        playMapWidget.play();
+                    } else {
+                            options = {
+                                    label: "play",
+                                    icons: {
+                                            primary: "ui-icon-play"
+                                    }
+                            };
+                        playMapWidget.pause();
+                    }
+                    $( this ).button( "option", options );
+            });
+            forward.click(function() {
+                var increment = playMapWidget.getTimerIncrement();
+                if(increment < -defaultIncrement) {
+                    increment /= 2;
+                } else if(increment == -defaultIncrement) {
+                    increment = defaultIncrement;
+                } else {
+                    increment *= 2;
+                }
+                playMapWidget.setTimerIncrement(increment);
+            });
+            rewind.click(function() {
+                var increment = playMapWidget.getTimerIncrement();
+                if(increment > defaultIncrement) {
+                    increment /= 2;
+                } else if(increment == defaultIncrement) {
+                    increment = -defaultIncrement;
+                } else {
+                    increment *= 2;
+                }
+                playMapWidget.setTimerIncrement(increment);
+            });
+            beginning.click(function() {
+                var startTime = playMapWidget.getStartTime();
+                playMapWidget.setCurrentTime(startTime);
+            });
+            end.click(function() {
+                var stopTime = playMapWidget.getStopTime();
+                playMapWidget.setCurrentTime(stopTime);
+            });
+            stop.click(function() {
+                $( "#play" ).button( "option", {
+                        label: "play",
+                        icons: {
+                                primary: "ui-icon-play"
+                        }
+                });
+                var startTime = playMapWidget.getStartTime();
+                playMapWidget.pause();
+                playMapWidget.setTimerIncrement(defaultIncrement);
+                playMapWidget.setCurrentTime(startTime);
+            });
+            interpolated.change(function() {
+                playMapWidget.setDisplayOptions(getOptions());
+            });
+            // udpate time label
+            playMapWidget.addEventListener(playMap.events.timeChanged,
+                function(timeValue){
+                    time.text(new Date(timeValue).toGMTString())
+                });
+            function getExample() {
+                return $('#example').find('option:selected').val();
+            }
+            for(var exampleName in examples) {
+                $('<option value="' + exampleName + '">' + exampleName + '</option>').appendTo($('#example'));
+            }
+            runExample(getExample());
+            var entityList = $('ul#entityList');
+            playMapWidget.addEventListener(playMap.events.dataReady, function() {
+                entityList.empty();
+                var entities = playMapWidget.getEntities();
+                var entityName;
+                var entity;
+                for(entityName in entities) {
+                    entity = entities[entityName];
+                    var item = $('<li><input type="checkbox" checked="checked"/>' + entityName + '</li>').appendTo(entityList);
+                    var name = entityName;
+                    item.find('input').change(function() {
+                        playMapWidget.setEntityVisibility($(this).is(':checked'), name);
+                    });
+                }
+            });
+    }
+
+    function getOptions() {
+        var trace = $('#trace');
+        var interpolated = $('#interpolated');
+        return {
+            traces: {on: trace.is(':checked')},
+            interpolated: interpolated.is(':checked'),
+            type: {type: "genericOverlay", options: {image: './books.png'}}
+        };
+    }
+
+    function runExample(example) {
+        playMapWidget.cleanUp();
+        (examples[example] || function(){})();
+    }
+
+    // displays satellites orbitting with their traces and their positions interpolated
+    // each satellite has an icon
+    function runSatelliteOrbit() {
+        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Text, Number, Location, Date FROM 420307"));
+        query.send(function(response) {
+                var satelliteIcons = {'envisat': 'envisat.png', 'default': 'http://www.n2yo.com/img/icons/00000.gif'};
+                var entityIndex = 0;
+                var options = getOptions();
+                options.type = {type: "genericOverlay", 
+                                options: {
+                                    image: function(data) {return (satelliteIcons[data[entityIndex]] || satelliteIcons['default']);},
+                                    info: function(data) {return 'Satellite Name: ' + data[entityIndex] + '</br>Altitude: ' + data[1]}
+                                }};
+                pushFTData(response, 3, 2, 0, options);
+            });
+    }
+
+    // displays boats navigating with their traces and their positions interpolated
+    // each boat has an icon which indicates its heading
+    function runBoatsTraffic() {
+        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Text, Number, Location, Date FROM 420307"));
+        query.send(function(response) {
+                var options = getOptions();
+                pushFTData(response, 3, 2, 0, options);
+            });
+    }
+
+    // displays RT boats traffic with their traces and their positions interpolated
+    // each boat has an icon which indicates its heading
+    function runRTBoatsTraffic() {
+        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Text, Number, Location, Date FROM 420307"));
+        query.send(function(response) {
+                var options = getOptions();
+                pushFTData(response, 3, 2, 0, options);
+            });
+    }
+
+    function infoWindow(rowData) {
+            return rowData[0] + ' ' + rowData[1];
+    }
+
+    /* GVIZ - get data from Fusion Tables */
+
+    //define callback function, this is called when the results are returned
+    function pushFTData(response, timeIndex, geometryIndex, entityIndex, options, geocoded) {
+
+      //for more information on the response object, see the documentation
+      //http://code.google.com/apis/visualization/documentation/reference.html#QueryResponse
+      var numRows = response.getDataTable().getNumberOfRows();
+      var numCols = response.getDataTable().getNumberOfColumns();
+
+      var data = [];
+      //create an array of row values
+      for (i = 0; i < numRows; i++) {
+        var row = [];
+        for (j = 0; j < numCols; j++) {
+          row.push(response.getDataTable().getValue(i, j));
+        }
+        if(!geocoded) {
+            geocodeRow(row, geometryIndex);
+        }
+        data.push(row);
+      }
+      playMapWidget.pushData(entityIndex, data, timeIndex, geometryIndex, options);
+    }
+
+    /* GEOCODING - geocode data in Fusion Tables, if the data is a String Address */
+
+    //geocode the address
+    function geocodeRow(row, geometryIndex) {
+      geocoder.geocode( { 'address': row[geometryIndex] }, function(results, status) {
+        if (status == google.maps.GeocoderStatus.OK) {
+          var coordinate = results[0].geometry.location;
+          row[geometryIndex] = coordinate;
+        }
+      });
+    }
+
+</script>
+
+  </body>
+</html>
