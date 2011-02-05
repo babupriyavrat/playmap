@@ -335,6 +335,17 @@ playMap.PlayMap = function(map, continuous, userOptions) {
             }
         }
     }
+    player._cleanUp = function() {
+        var entity;
+        var dataRows = player._dataRows;
+        for(var entityName in dataRows) {
+            entity = dataRows[entityName];
+            if(entity.overlay) {
+                entity.overlay.setMap(null);
+            }
+        }
+        player._dataRows = {};
+    }
 }
 //inheritMethods(playMap.PlayMap, playMap.eventHandlers);
 inheritMethods(playMap.PlayMap, playMap.eventHandlers, "superEventHandlers");
@@ -421,7 +432,7 @@ playMap.PlayMap.prototype.getStopTime = function() {
 }
 
 playMap.PlayMap.prototype.cleanUp = function() {
-    return this._cleanUp;
+    this._cleanUp();
 }
 
 playMap.PlayMap.prototype.setCurrentTime = function(currentTime) {
@@ -573,6 +584,7 @@ playMap.overlays.createDefault = function(geometry) {
 
 playMap.overlays.genericOverlay = function(options, map) {
     this.superEventHandler();
+    options = options || {};
     this.info_ = options.info;
     if(map) {
         this.setMap(map);
@@ -608,8 +620,10 @@ playMap.overlays.genericOverlay.prototype.show = function() {
 }
 
 playMap.overlays.genericOverlay.prototype.onRemove = function() {
-    this.div_.parentNode.removeChild(this.div_);
-    this.div_ = null;
+    if(this.div_) {
+        this.div_.parentNode.removeChild(this.div_);
+        this.div_ = null;
+    }
 }
 
 
@@ -685,37 +699,38 @@ playMap.overlays.imageOverlay.prototype.onAdd = function() {
 }
 playMap.overlays.imageOverlay.prototype.draw = function() {
 
+    var that = this;
     // check map and positions have been set
-    if(this.position_ && this.getMap()) {
+    if(that.position_ && that.getMap()) {
         // We need to retrieve the projection from this overlay to do this.
-        var overlayProjection = this.getProjection();
+        var overlayProjection = that.getProjection();
 
         if(overlayProjection) {
             // Retrieve the northeast coordinates of this overlay
             // in latlngs and convert them to pixels coordinates.
             // We'll use these coordinates to resize the DIV.
-            var coordinates = overlayProjection.fromLatLngToDivPixel(this.position_);
+            var coordinates = overlayProjection.fromLatLngToDivPixel(that.position_);
 
             // Resize the image's DIV to fit the indicated dimensions.
-            var div = this.div_;
+            var div = that.div_;
             div.style.left = coordinates.x + 'px';
             div.style.top = coordinates.y + 'px';
 
             // check if image has changed
-            if(typeof this.image_ == "function") {
-                this.imgElement_.src = this.image_(this.currentData_);
+            if(typeof that.image_ == "function") {
+                that.imgElement_.src = that.image_(that.currentData_);
             }
         }
     }
 }
 
-playMap.overlays.genericMarker = function() {
-    this.div_ = null;
+playMap.overlays.genericMarker = function(map, options) {
+    this.superGenericOverlay(options, map);
 }
 
-inheritMethods(playMap.overlays.genericMarker, playMap.overlays.genericOverlay, "superGenericOverlay");
-
 playMap.overlays.genericMarker.prototype = new google.maps.Marker();
+
+inheritMethods(playMap.overlays.genericMarker, playMap.overlays.genericOverlay, "superGenericOverlay");
 
 playMap.overlays.genericMarker.prototype.show = function() {
     this.setVisible(true);
@@ -725,6 +740,10 @@ playMap.overlays.genericMarker.prototype.hide = function() {
     this.setVisible(false);
 }
 
+playMap.overlays.genericMarker.prototype.draw = function() {
+}
+
+// Bar Chart display using canvas
 playMap.overlays.barChart = function(options, map) {
     this.superGenericOverlay(options, map);
     this.canvas_ = null;
@@ -750,7 +769,7 @@ playMap.overlays.barChart.prototype.onAdd = function() {
     canvas.style.height = "32px";
     div.appendChild(canvas);
     that.canvas_ = canvas;
-    that.canvas_.onclick = function(){
+    that.div_.onclick = function(){
         that._fireEvent('click');
     };
     if(that.info_) {
@@ -767,25 +786,26 @@ playMap.overlays.barChart.prototype.onAdd = function() {
 }
 playMap.overlays.barChart.prototype.draw = function() {
 
+    var that = this;
     // check map and positions have been set
-    if(this.position_ && this.getMap()) {
+    if(that.position_ && that.getMap()) {
         // We need to retrieve the projection from this overlay to do this.
-        var overlayProjection = this.getProjection();
+        var overlayProjection = that.getProjection();
 
         if(overlayProjection) {
             // Retrieve the northeast coordinates of this overlay
             // in latlngs and convert them to pixels coordinates.
             // We'll use these coordinates to resize the DIV.
-            var coordinates = overlayProjection.fromLatLngToDivPixel(this.position_);
+            var coordinates = overlayProjection.fromLatLngToDivPixel(that.position_);
 
             // Resize the image's DIV to fit the indicated dimensions.
-            var div = this.div_;
+            var div = that.div_;
             div.style.left = coordinates.x + 'px';
             div.style.top = coordinates.y + 'px';
 
             // redraw the barGraph
-            if(typeof this.height_ == "function") {
-                playMap.overlays.draw3DBar(this.canvas_, this.height_(this.currentData_));
+            if(typeof that.height_ == "function") {
+                playMap.overlays.draw3DBar(that.canvas_, that.height_(that.currentData_));
             }
         }
     }
