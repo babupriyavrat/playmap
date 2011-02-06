@@ -16,6 +16,7 @@
     <style>
         #toolbar {
                 padding: 10px 4px;
+                font-size: 12px;
         }
     </style>
 
@@ -66,35 +67,41 @@
                 </div>
             </td>
         </tr>
+        <tr>
+            <td>
+                <div class="demo">
+
+                    <span id="toolbar" class="ui-widget-header ui-corner-all">
+                            <button id="beginning">go to beginning</button>
+                            <button id="rewind">rewind</button>
+                            <button id="play">play</button>
+                            <button id="stop">stop</button>
+                            <button id="forward">fast forward</button>
+                            <button id="end">go to end</button>
+
+                            <span id="repeat">
+                                    <input type="radio" id="repeat0" name="repeat" checked="checked" /><label for="repeat0">No Repeat</label>
+                                    <input type="radio" id="repeat1" name="repeat" /><label for="repeat1">Once</label>
+                                    <input type="radio" id="repeatall" name="repeat" /><label for="repeatall">All</label>
+                            </span>
+
+                            <label id="time"></label>
+                    </span>
+
+                </div><!-- End demo -->
+
+            <div class="demo-description">
+            <p>
+                    A mediaplayer toolbar, code from <a href="http://jqueryui.com/demos/button/#toolbar">JQuery UI</a>.
+                    Used to demonstrate the different scenarios possible with PlayMap.
+            </p>
+            </div><!-- End demo-description -->
+            </td>
+            <td>
+            </td>
+        </tr>
     </table>
 
-    <div class="demo">
-
-        <span id="toolbar" class="ui-widget-header ui-corner-all">
-                <button id="beginning">go to beginning</button>
-                <button id="rewind">rewind</button>
-                <button id="play">play</button>
-                <button id="stop">stop</button>
-                <button id="forward">fast forward</button>
-                <button id="end">go to end</button>
-
-                <span id="repeat">
-                        <input type="radio" id="repeat0" name="repeat" checked="checked" /><label for="repeat0">No Repeat</label>
-                        <input type="radio" id="repeat1" name="repeat" /><label for="repeat1">Once</label>
-                        <input type="radio" id="repeatall" name="repeat" /><label for="repeatall">All</label>
-                </span>
-
-                <label id="time"></label>
-        </span>
-
-    </div><!-- End demo -->
-
-<div class="demo-description">
-<p>
-	A mediaplayer toolbar, code from <a href="http://jqueryui.com/demos/button/#toolbar">JQuery UI</a>.
-        Used to demonstrate the different scenarios possible with PlayMap.
-</p>
-</div><!-- End demo-description -->
 
 <script type="text/javascript">
 
