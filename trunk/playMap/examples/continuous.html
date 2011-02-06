@@ -98,7 +98,6 @@
 
 <script type="text/javascript">
 
-    var tableid = 297050; //the table id
     var map;
     var geocoder;
     var lastWindow;
@@ -168,7 +167,7 @@
             // a play/pause, accelerate and stop button
             // a checkbox for displaying traces and extrapolating positions
             playMapWidget = new playMap.ContinuousPlayMap(map, 1000.0);
-            var defaultIncrement = 24 * 3600 * 1000;
+            var defaultIncrement = 600 * 1000;
             playMapWidget.setTimerIncrement(defaultIncrement);
             play.click(function() {
                     var options;
@@ -232,6 +231,7 @@
                 playMapWidget.pause();
                 playMapWidget.setTimerIncrement(defaultIncrement);
                 playMapWidget.setCurrentTime(startTime);
+                playMapWidget.setTimerIncrement(defaultIncrement);
             });
             interpolated.change(function() {
                 playMapWidget.setDisplayOptions(getOptions());
@@ -286,18 +286,21 @@
     // displays satellites orbitting with their traces and their positions interpolated
     // each satellite has an icon
     function runSatelliteOrbit() {
-        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Text, Number, Location, Date FROM 420307"));
+        var interpolated = $('#interpolated');
+        interpolated.attr("checked", "checked");
+        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Name, Start, Position FROM 432647"));
         query.send(function(response) {
-                var satelliteIcons = {'envisat': 'envisat.png', 'default': 'http://www.n2yo.com/img/icons/00000.gif'};
+                var satelliteIcons = {'ENVISAT': '27386', 'LANDSAT 7': '23560', 'SPOT 5': '00000', 'default': '33331'};
                 var entityIndex = 0;
                 var options = getOptions();
                 options.type = {type: "imageOverlay",
                                 options: {
-                                    image: function(data) {return (satelliteIcons[data[entityIndex]] || satelliteIcons['default']);},
+                                    image: function(data) {return ('http://www.n2yo.com/img/icons/' + (satelliteIcons[data[entityIndex]] || satelliteIcons['default']) + '.gif');},
                                     info: function(data) {return 'Satellite Name: ' + data[entityIndex] + '</br>Altitude: ' + data[1]}
                                 }};
-                pushFTData(response, 3, 2, 0, options);
+                pushFTData(response, 1, 2, 0, options);
             });
+        map.setZoom(1);
     }
 
     // displays boats navigating with their traces and their positions interpolated
