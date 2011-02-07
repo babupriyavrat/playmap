@@ -9,7 +9,8 @@ var playMap = {
         // timeTick event fired for each update, the current time value is passed to the handler
         timeChanged: "timeChanged",
         dataReady: "dataReady",
-        requiresMoreData: "requiresMoreData"
+        requiresMoreData: "requiresMoreData",
+        endOfData: "endOfData"
     }
 };
 
@@ -73,7 +74,7 @@ playMap.eventHandlers.prototype.removeListener = function(listener, type) {
 }
 
 // provides a timer with a refresh function
-playMap.PlayMap = function(map, continuous, userOptions) {
+playMap.PlayMap = function(map) {
     this.superEventHandlers();
     // private fields and methods
     var player = this;
@@ -93,41 +94,47 @@ playMap.PlayMap = function(map, continuous, userOptions) {
         // display with nearest to current value
         var entityName;
         var dataRows = player._dataRows;
+        for(entityName in dataRows) {
+            player._updateEntity(dataRows[entityName]);
+        }
+        if(player._currentTime > player._stopTime) {
+            player._fireEvent(playMap.events.endOfData);
+        }
+    }
+    player._updateEntity = function(entity) {
         var row;
-        var entity;
         var entityDataRows;
         var entityDataLength;
         var index;
-        for(entityName in dataRows) {
-            // find first row with time crossing the currentTime
-            entity = dataRows[entityName];
-            entityDataRows = entity.data;
-            entityDataLength = entityDataRows.length;
-            if(entityDataLength == 0) {
-                continue;
-            }
-            // only one item
-            if(entityDataLength == 1) {
-                player._updateOverlay(0, entity, true);
-            }
-            // before the first item
-            row = entityDataRows[0];
+        // find first row with time crossing the currentTime
+        entityDataRows = entity.data;
+        entityDataLength = entityDataRows.length;
+        if(entityDataLength == 0) {
+            return;
+        }
+        // only one item
+        if(entityDataLength == 1) {
+            player._updateOverlay(0, entity, true);
+            return;
+        }
+        // before the first item
+        row = entityDataRows[0];
+        if(player._currentTime < row.time) {
+            player._updateOverlay(0, entity, true);
+            return;
+        }
+        for(index = 1; index < entityDataLength; index++) {
+            row = entityDataRows[index];
+            // find first intersection
             if(player._currentTime < row.time) {
-                player._updateOverlay(index, entity, true);
-                break;
+                player._updateOverlay(index, entity, false);
+                return;
             }
-            for(index = 1; index < entityDataLength; index++) {
-                row = entityDataRows[index];
-                // find first intersection
-                if(player._currentTime < row.time) {
-                    player._updateOverlay(index, entity, false);
-                    break;
-                }
-            }
-            // after the last item
-            if(index == entityDataLength) {
-                player._updateOverlay(index - 1, entity, true);
-            }
+        }
+        // after the last item
+        if(index == entityDataLength) {
+            player._updateOverlay(index - 1, entity, true);
+            return;
         }
     }
 
@@ -137,6 +144,10 @@ playMap.PlayMap = function(map, continuous, userOptions) {
             entity.overlay = player._createOverlay(row.geometry, entity.options.type);
             // force refresh of overlay geometry
             entity.currentIndex = null;
+            // set trace if required
+            if(entity.trace) {
+                entity.overlay.setTrace(entity.trace.on || false, entity.trace.options);
+            }
         }
         // if the point is a fixed point (unique, before first or after last)
         // whether or not it needs redrawing depends on the overlay and the currentIndex
@@ -159,7 +170,7 @@ playMap.PlayMap = function(map, continuous, userOptions) {
                     // check which is the nearest
                     // update geometry
                     player._updateOverlayGeometry(entity.overlay, row.geometry);
-                    updateIndex();
+//                    updateIndex();
                 }
             }
         }
@@ -171,6 +182,16 @@ playMap.PlayMap = function(map, continuous, userOptions) {
             // update current geometry index
             entity.currentIndex = index;
             entity.overlay.updateData(row.data);
+            // refresh trace path if required
+            if(entity.trace && entity.trace.on && entity.trace.on === true) {
+                // create geometry array based on trace length and current index
+                // at the very least add the current and previous position
+                if(index > 0) {
+                    var previousRow = entity.data[index - 1];
+                    var path = [row.geometry, previousRow.geometry];
+                    entity.overlay.setTracePath(path);
+                }
+            }
         }
     }
     player._interpolateGeometry = function(firstRow, nextRow) {
@@ -283,45 +304,29 @@ playMap.PlayMap = function(map, continuous, userOptions) {
             currentTime = startTime;
             player.setCurrentTime(currentTime);
         }
-    //    if(currentTime > stopTime) {
-    //        currentTime = stopTime;
-    //    }
-    //    if(currentTime < startTime) {
-    //        currentTime = startTime;
-    //    }
-
         // fire an "dataReady" event
         player._fireEvent(playMap.events.dataReady);
     }
     player._setEntityDisplayOptions = function(entityName, options) {
-        this._dataRows[entityName].options = options;
-//        var entityOptions = this._dataRows[entityName].options;
-//        options = options || {};
-//        // options for traces are {color: , fading: , length: }
-//        // default is {}
-//        if(options.traces) {
-//            entityOptions.traces = entityOptions.traces || {}
-//            var traces = entityOptions.traces;
-//            var opt = options.traces;
-//            traces.on = opt.on;
-//            traces.color = opt.color || traces.color;
-//            traces.fading = opt.fading || traces.fading;
-//            traces.length = opt.length || traces.length;
-//        }
-//        // interpolated is a boolean
-//        // default is false
-//        if(options.interpolated != undefined) {
-//            entityOptions.interpolated =  options.interpolated;
-//        }
-//        // options for markers are the marker properties for all markers or a function that returns a marker for each row value
-//        // options for bubbles are the shape, the color, filled, the size as a function
-//        // options for heatmap are a function for the color
-//        // options for bar are type {2d, 3d} and color which can be a value or a function
-//        // options for filledPolygon are a function for the fill color and the stroke color
-//        // default type is set to {} which defaults to "marker" with a standard icon for a point and polygon for a polygon
-//        if(options.type) {
-//            entityOptions.type = options.type;
-//        }
+        var entity = this._dataRows[entityName];
+        if(options) {
+            if(options.trace) {
+                entity.trace = options.trace;
+                if(entity.overlay) {
+                    entity.overlay.setTrace(options.trace.on || false, options.trace.options);
+                }
+            }
+            if(options.interpolated != undefined) {
+                entity.interpolated = options.interpolated;
+            }
+            if(options.path) {
+            }
+            if(options.type) {
+                entity.type = options.type;
+                // force refresh of overlay
+                entity.overlay = null;
+            }
+        }
     }
     player._setEntityVisible = function(entityName, visible) {
         var entity = player._dataRows[entityName];
@@ -350,32 +355,6 @@ playMap.PlayMap = function(map, continuous, userOptions) {
 //inheritMethods(playMap.PlayMap, playMap.eventHandlers);
 inheritMethods(playMap.PlayMap, playMap.eventHandlers, "superEventHandlers");
 
-//playMap.PlayMap.prototype.addEventListener = function(listener, type) {
-//    if(listener && type) {
-//        if(this._listeners[type] == undefined) {
-//            this._listeners[type] = [];
-//        }
-//        this._listeners[type].push(listener)
-//    }
-//}
-//
-//playMap.PlayMap.prototype.removeListener = function(listener, type) {
-//    if(listener && type) {
-//        var listeners = this._listeners[type];
-//        if(listeners == undefined) {
-//        } else {
-//            var index = 0;
-//            var length = listeners.length;
-//            for(; index < length; index++) {
-//                if(listeners[index] == listener) {
-//                    delete listeners[index];
-//                    return;
-//                }
-//            }
-//        }
-//    }
-//}
-
 playMap.PlayMap.prototype.pushEntityData = function(entityName, data, timeIndex, geometryIndex, displayOptions) {
     this._pushData(entityName, data, timeIndex, geometryIndex, displayOptions);
 }
@@ -401,7 +380,7 @@ playMap.PlayMap.prototype.setEntityVisibility = function(visible, entityName) {
     }
 }
 
-// set the display options as {traces: , interpolated: , type: {type: ("marker" (points), "bubble" (points), "heatmap" (points), "filledPolygon" (polygon)), options: }
+// set the display options as {traces: , interpolated: boolean, path: {boolean, displayOptions}, type: {type: ("marker" (points), "bubble" (points), "heatmap" (points), "filledPolygon" (polygon)), options: }
 playMap.PlayMap.prototype.setDisplayOptions = function(options, entityName) {
     options = options || {};
     // if no entity name is provided, options apply to all entities
@@ -447,8 +426,8 @@ playMap.PlayMap.prototype.getCurrentTime = function() {
     return this._currentTime;
 }
 
-playMap.ContinuousPlayMap = function(map, resfreshInterval, userOptions) {
-    this.superPlayMap(map, userOptions);
+playMap.ContinuousPlayMap = function(map, resfreshInterval) {
+    this.superPlayMap(map);
     var player = this;
     // the function called for each time iteration, in continuous mode
     player._tick = function() {
@@ -487,7 +466,7 @@ playMap.parseTime = function(time) {
     if(time.getTime) {
         return time.getTime();
     } else {
-        var timeValue = new Date(time).getTime();
+        var timeValue = (new Date(time * 1000.0)).getTime();
         if(!isNaN(timeValue)) {
             return timeValue;
         } else {
@@ -575,7 +554,6 @@ playMap.overlays.createDefault = function(geometry) {
     // geometry is either a LatLng coordinate or a MVCArray path
     if(geometry.lat) {
         overlay = new playMap.overlays.genericMarker();
-//        overlay.setVisible(false);
     } else if(geometry.getArray) {
         overlay = new google.maps.Polyline();
     }
@@ -592,6 +570,9 @@ playMap.overlays.genericOverlay = function(options, map) {
     this.div_ = null;
     // field for the currently displayed data row
     this.currentData_ = null;
+    // field for the trace overlay
+    // it is down to the subclasses to set this field or not
+    this.traceOverlay_ = null;
 }
 
 playMap.overlays.genericOverlay.prototype = new google.maps.OverlayView();
@@ -646,11 +627,17 @@ playMap.overlays.genericOverlay.displayInfoWindow = function(that) {
 playMap.overlays.genericOverlay.prototype.getPosition = function() {
     return this.position_;
 }
+
 playMap.overlays.genericOverlay.prototype.setPosition = function(position) {
     this.position_ = position;
     this.draw();
 }
 
+playMap.overlays.genericOverlay.prototype.setTrace = function(enabled) {
+    // does nothing, it is up to the subclasses to implement this method
+}
+
+// this is the equivalent of a light weight marker
 playMap.overlays.imageOverlay = function(options, map) {
     this.superGenericOverlay(options, map);
     options = options || {};
@@ -721,6 +708,32 @@ playMap.overlays.imageOverlay.prototype.draw = function() {
                 that.imgElement_.src = that.image_(that.currentData_);
             }
         }
+    }
+}
+
+playMap.overlays.imageOverlay.prototype.setTrace = function(enabled, options) {
+    // if enabled and no trace already exists, create a polyline
+    if(enabled == true) {
+        if(this.traceOverlay_ == null) {
+            this.traceOverlay_ = new google.maps.Polyline();
+            this.traceOverlay_.setMap(this.getMap());
+            // force option settings
+            options = options || {};
+        }
+        if(options) {
+            this.traceOverlay_.setOptions({clickable: true, geodesic: true, strokeColor: (options.strokeColor || "#FAA"), strokeOpacity: (options.strokeOpacity || 0.7), strokeWeight: (options.strokeWeight || 3)});
+        }
+    } else {
+        if(this.traceOverlay_ != null) {
+            this.traceOverlay_.setMap(null);
+            this.traceOverlay_ = null;
+        }
+    }
+}
+
+playMap.overlays.imageOverlay.prototype.setTracePath = function(path) {
+    if(path && this.traceOverlay_ != null) {
+        this.traceOverlay_.setPath(path);
     }
 }
 

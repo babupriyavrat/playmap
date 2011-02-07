@@ -17,6 +17,10 @@
         #toolbar {
                 padding: 10px 4px;
                 font-size: 12px;
+                width: 100%;
+        }
+        #toolbar > #time {
+            float: right;
         }
     </style>
 
@@ -47,14 +51,11 @@
 
     <p>Continuous PlayMap<a href="./discrete.html" target="_top" style="float:right;">Go To Discrete PlayMap</a></p>
     <p>This example demonstrates the use of PlayMap with a Continuous player, that is to stay a continuous timed refresh of
-        geographical information data. Continuous Play Map can be run on either live or replay, similar to a video and video feed.
-        Information is passed to the widget as a table of values, specify which index is the time column, and the geometry column
-        Use pushEntityData to specify data and display Options on an entity by entity level
-        Use pushRawData to create on the fly entities by specifying the entity column in the table
-        You can customise the appearance of your data on the map by specifying display options for each channels or for all.
+        geographical information data, with the possibility to interpolate positions between geometry values and leave a trace.<br>
+        Animation can be played back and forth as with a video player.
     </p>
 
-    <table>
+    <table id="demotable">
         <tr>
             <td><div id="map_canvas"></div></td>
             <td>
@@ -68,7 +69,7 @@
             </td>
         </tr>
         <tr>
-            <td>
+            <td style="width: 700px;">
                 <div class="demo">
 
                     <span id="toolbar" class="ui-widget-header ui-corner-all">
@@ -80,9 +81,9 @@
                             <button id="end">go to end</button>
 
                             <span id="repeat">
-                                    <input type="radio" id="repeat0" name="repeat" checked="checked" /><label for="repeat0">No Repeat</label>
-                                    <input type="radio" id="repeat1" name="repeat" /><label for="repeat1">Once</label>
-                                    <input type="radio" id="repeatall" name="repeat" /><label for="repeatall">All</label>
+                                    <input type="checkbox" id="repeat" name="repeat" checked="checked" /><label for="repeat">Repeat</label>
+<!--                                    <input type="radio" id="norepeat" name="repeat" /><label for="norepeat">Repeat</label>-->
+<!--                                    <input type="radio" id="repeatall" name="repeat" /><label for="repeatall">All</label>-->
                             </span>
 
                             <label id="time"></label>
@@ -94,6 +95,13 @@
             <p>
                     A mediaplayer toolbar, code from <a href="http://jqueryui.com/demos/button/#toolbar">JQuery UI</a>.
                     Used to demonstrate the different scenarios possible with PlayMap.
+            </p>
+            <p>
+                Continuous Play Map can be run on either live or replay, similar to a video and video feed.
+                Information is passed to the widget as a table of values, specify which index is the time column, and the geometry column
+                Use pushEntityData to specify data and display Options on an entity by entity level
+                Use pushRawData to create on the fly entities by specifying the entity column in the table
+                You can customise the appearance of your data on the map by specifying display options for each channels or for all.
             </p>
             </div><!-- End demo-description -->
             </td>
@@ -113,11 +121,11 @@
         "Satellite Orbits Replay": runSatelliteOrbit,
         "Boat Traffic Replay": runBoatsTraffic
     }
+    var defaultIncrement = 60 * 1000;
 
     $('document').ready(initialize);
 
     /* INITIALIZE - initialize the map and geocoder */
-
     function initialize() {
 
             var beginning = $( "#beginning" ).button({
@@ -157,7 +165,7 @@
                     }
             });
             var time = $("#time");
-            $( "#repeat" ).buttonset();
+            var repeat = $( "span#repeat" ).buttonset();
             $( "#slider" ).slider();
             var trace = $('#trace');
             var interpolated = $('#interpolated');
@@ -170,11 +178,7 @@
 
             geocoder = new google.maps.Geocoder();
 
-            // test 1 with continuous move of markers
-            // a play/pause, accelerate and stop button
-            // a checkbox for displaying traces and extrapolating positions
             playMapWidget = new playMap.ContinuousPlayMap(map, 1000.0);
-            var defaultIncrement = 600 * 1000;
             playMapWidget.setTimerIncrement(defaultIncrement);
             play.click(function() {
                     var options;
@@ -241,7 +245,10 @@
                 playMapWidget.setTimerIncrement(defaultIncrement);
             });
             interpolated.change(function() {
-                playMapWidget.setDisplayOptions(getOptions());
+                playMapWidget.setDisplayOptions({interpolated: interpolated.is(':checked')});
+            });
+            trace.change(function() {
+                playMapWidget.setDisplayOptions({trace: {on: trace.is(':checked')}});
             });
             // udpate time label
             playMapWidget.addEventListener(playMap.events.timeChanged,
@@ -266,11 +273,17 @@
                 var entity;
                 for(entityName in entities) {
                     entity = entities[entityName];
-                    var item = $('<li><input type="checkbox" checked="checked"/>' + entityName + '</li>').appendTo(entityList);
-                    var name = entityName;
+                    var item = $('<li><input type="checkbox" checked="checked" name="' + entityName + '" />' + entityName + '</li>').appendTo(entityList);
                     item.find('input').change(function() {
-                        playMapWidget.setEntityVisibility($(this).is(':checked'), name);
+                        var checked = $(this).is(':checked');
+                        var name = $(this).attr("name");
+                        playMapWidget.setEntityVisibility(checked, name);
                     });
+                }
+            });
+            playMapWidget.addEventListener(playMap.events.endOfData, function() {
+                if($("input#repeat").is(':checked')) {
+                    playMapWidget.setCurrentTime(playMapWidget.getStartTime());
                 }
             });
     }
@@ -297,7 +310,7 @@
         interpolated.attr("checked", "checked");
         var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Name, Start, Position FROM 432647"));
         query.send(function(response) {
-                var satelliteIcons = {'ENVISAT': '27386', 'LANDSAT 7': '23560', 'SPOT 5': '00000', 'default': '33331'};
+                var satelliteIcons = {'ENVISAT': '27386', 'LANDSAT 7': '23560', 'SPOT 5': '00000', 'QUIKSCAT': '00000', 'default': '33331'};
                 var entityIndex = 0;
                 var options = getOptions();
                 options.type = {type: "imageOverlay",
@@ -308,6 +321,9 @@
                 pushFTData(response, 1, 2, 0, options);
             });
         map.setZoom(1);
+        playMapWidget.addEventListener(playMap.events.dataReady, function() {
+            playMapWidget.setCurrentTime(playMapWidget.getStartTime() + 75 * 60 * 1000);
+        });
     }
 
     // displays boats navigating with their traces and their positions interpolated
@@ -350,9 +366,6 @@
         var row = [];
         for (j = 0; j < numCols; j++) {
           row.push(response.getDataTable().getValue(i, j));
-        }
-        if(!geocoded) {
-            geocodeRow(row, geometryIndex);
         }
         data.push(row);
       }
