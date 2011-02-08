@@ -145,8 +145,8 @@ playMap.PlayMap = function(map) {
             // force refresh of overlay geometry
             entity.currentIndex = null;
             // set trace if required
-            if(entity.trace) {
-                entity.overlay.setTrace(entity.trace.on || false, entity.trace.options);
+            if(entity.options.trace) {
+                entity.overlay.setTrace(entity.options.trace.on || false, entity.options.trace.options);
             }
         }
         // if the point is a fixed point (unique, before first or after last)
@@ -170,7 +170,6 @@ playMap.PlayMap = function(map) {
                     // check which is the nearest
                     // update geometry
                     player._updateOverlayGeometry(entity.overlay, row.geometry);
-//                    updateIndex();
                 }
             }
         }
@@ -183,16 +182,28 @@ playMap.PlayMap = function(map) {
             entity.currentIndex = index;
             entity.overlay.updateData(row.data);
             // refresh trace path if required
-            if(entity.trace && entity.trace.on && entity.trace.on === true) {
-                // create geometry array based on trace length and current index
-                // at the very least add the current and previous position
-                if(index > 0) {
-                    var previousRow = entity.data[index - 1];
-                    var path = [row.geometry, previousRow.geometry];
-                    entity.overlay.setTracePath(path);
-                }
+            if(entity.options.trace && entity.options.trace.on && entity.options.trace.on === true) {
+                player._setEntityTracePath(entity);
             }
+            entity.overlay.draw();
         }
+    }
+    player._setEntityTracePath = function(entity) {
+        // create geometry array based on trace length and current index
+        // at the very least add the current and previous position
+        var index = entity.currentIndex;
+        var timeLength = entity.options.trace.length || 100 * 1000.0;
+        var targetTime = entity.data[index].time - timeLength;
+        var path = []; //entity.overlay.getGeometry()];
+        // scan back and add points until the trace length is met
+        for(; index >= 0 && (entity.data[index].time > targetTime); index--) {
+            path.push(entity.data[index].geometry);
+        }
+        if(index > 0) {
+            // add the interpolated remaining portion
+            path.push(player._interpolateGeometry(entity.data[index - 1], entity.data[index]));
+        }
+        entity.overlay.setTracePath(path);
     }
     player._interpolateGeometry = function(firstRow, nextRow) {
         var firstGeometry = firstRow.geometry;
@@ -260,9 +271,14 @@ playMap.PlayMap = function(map) {
                 dataRows[entityName] = {
                     currentIndex: null,
                     overlay: null,
-                    options: displayOptions,
+                    options: {
+                        trace: {on: false, length: 1000, options: {strokeColor: "#fff"}},
+                        interpolated: false,
+                        type: {}
+                    },
                     data: []
                 };
+                player._setEntityDisplayOptions(entityName, displayOptions);
             }
             // add the row to the entry data
             dataRows[entityName].data.push({
@@ -311,20 +327,32 @@ playMap.PlayMap = function(map) {
         var entity = this._dataRows[entityName];
         if(options) {
             if(options.trace) {
-                entity.trace = options.trace;
+                if(options.trace.on === true || options.trace.on === false) {
+                    entity.options.trace.on = options.trace.on;
+                }
+                if(options.trace.length) {
+                    entity.options.trace.length = options.trace.length;
+                }
+                if(options.trace.color) {
+                    entity.options.trace.color = options.trace.color;
+                }
+                // refresh if has changed
                 if(entity.overlay) {
-                    entity.overlay.setTrace(options.trace.on || false, options.trace.options);
+                    entity.overlay.setTrace(options.trace.on, options.trace.options);
+                    if(options.trace.on === true) {
+                        player._setEntityTracePath(entity);
+                    }
                 }
             }
             if(options.interpolated != undefined) {
-                entity.interpolated = options.interpolated;
+                entity.options.interpolated = (options.interpolated == true ? true : false);
             }
             if(options.path) {
             }
             if(options.type) {
-                entity.type = options.type;
+                entity.options.type = options.type;
                 // force refresh of overlay
-                entity.overlay = null;
+                entity.options.overlay = null;
             }
         }
     }
@@ -562,7 +590,7 @@ playMap.overlays.createDefault = function(geometry) {
 
 playMap.overlays.genericOverlay = function(options, map) {
     this.superEventHandler();
-    options = options || {};
+    this.options_ = options || {};
     this.info_ = options.info;
     if(map) {
         this.setMap(map);
@@ -656,6 +684,7 @@ playMap.overlays.imageOverlay.prototype.onAdd = function() {
     div.style.border = "none";
     div.style.borderWidth = "0px";
     div.style.position = "absolute";
+    div.style.cursor = "pointer";
 
     // Create an IMG element and attach it to the DIV.
     var img = document.createElement("img");
@@ -756,48 +785,44 @@ playMap.overlays.genericMarker.prototype.hide = function() {
 playMap.overlays.genericMarker.prototype.draw = function() {
 }
 
-// Bar Chart display using canvas
-playMap.overlays.barChart = function(options, map) {
+// generic canvas overlay
+playMap.overlays.canvasOverlay = function(options, map) {
     this.superGenericOverlay(options, map);
     this.canvas_ = null;
-    this.height_ = options.height;
 }
 
-inheritMethods(playMap.overlays.barChart, playMap.overlays.genericOverlay, "superGenericOverlay");
+inheritMethods(playMap.overlays.canvasOverlay, playMap.overlays.genericOverlay, "superGenericOverlay");
 
-playMap.overlays.barChart.prototype.onAdd = function() {
+playMap.overlays.canvasOverlay.prototype.onAdd = function() {
 
     var that = this;
     // Create the DIV and set some basic attributes.
     var div = document.createElement('DIV');
-    div.style.width = "60px";
-    div.style.height = "32px";
     div.style.border = "none";
     div.style.borderWidth = "0px";
     div.style.position = "absolute";
+    // Set the overlay's div_ property to this DIV
+    that.div_ = div;
 
     // Create a canvas element and attach it to the DIV.
     var canvas = document.createElement("canvas");
-    canvas.style.width = "60px";
-    canvas.style.height = "32px";
+    canvas.width = that.options_.width || 32;
+    canvas.height = that.options_.height || 32;
     div.appendChild(canvas);
     that.canvas_ = canvas;
-    that.div_.onclick = function(){
+    that.canvas_.onclick = function(){
         that._fireEvent('click');
     };
     if(that.info_) {
         that.addEventListener('click', function() {playMap.overlays.genericOverlay.displayInfoWindow(that);});
     }
 
-    // Set the overlay's div_ property to this DIV
-    that.div_ = div;
-
     // We add an overlay to a map via one of the map's panes.
     // We'll add this overlay to the overlayImage pane.
     var panes = that.getPanes();
     panes.overlayLayer.appendChild(div);
 }
-playMap.overlays.barChart.prototype.draw = function() {
+playMap.overlays.canvasOverlay.prototype.draw = function() {
 
     var that = this;
     // check map and positions have been set
@@ -811,33 +836,100 @@ playMap.overlays.barChart.prototype.draw = function() {
             // We'll use these coordinates to resize the DIV.
             var coordinates = overlayProjection.fromLatLngToDivPixel(that.position_);
 
-            // Resize the image's DIV to fit the indicated dimensions.
-            var div = that.div_;
-            div.style.left = coordinates.x + 'px';
-            div.style.top = coordinates.y + 'px';
+            // redraw the canvas
+            that.drawCanvas();
 
-            // redraw the barGraph
-            if(typeof that.height_ == "function") {
-                playMap.overlays.draw3DBar(that.canvas_, that.height_(that.currentData_));
-            }
+            // Reposition the div
+            var div = that.div_;
+            // assumes centered
+            div.style.left = coordinates.x - that.canvas_.width / 2 + 'px';
+            div.style.top = coordinates.y - that.canvas_.height / 2 + 'px';
+
         }
     }
 }
-playMap.overlays.draw3DBar = function(canvas, value) {
+playMap.overlays.canvasOverlay.prototype.drawCanvas = function() {
+    // do nothing, subclasses should override this method to provide a canvas drawing
+}
+
+// Bar Chart display using canvas
+playMap.overlays.barChart = function(options, map) {
+    this.superCanvasOverlay(options, map);
+    this.height_ = options.height;
+}
+
+inheritMethods(playMap.overlays.barChart, playMap.overlays.canvasOverlay, "superCanvasOverlay");
+
+// draw the barGraph
+playMap.overlays.barChart.prototype.drawCanvas = function() {
+    var that = this;
+    if(typeof that.height_ == "function") {
+        var canvas = that.canvas_;
+        var ctx = canvas.getContext('2d');
+        // clean the canvas
+        ctx.fillStyle = "rgba(255, 255, 255, 0)";
+        ctx.fillRect(0, 0, canvas.style.width, canvas.style.height);
+        ctx.strokeStyle = "rgba(100, 100, 100, 1)";
+        // draw the barGraph
+        var height = Math.min(that.height_(that.currentData_), 150);
+        // now draw the rectangle
+        ctx.fillStyle = "rgba(100, 255, 100, 1)";
+        ctx.fillRect(0, 0, 20, height);
+        ctx.strokeRect(0, 0, 20, height);
+    }
+}
+
+// Circles display using canvas
+playMap.overlays.circleChart = function(options, map) {
+    this.superCanvasOverlay(options, map);
+    this.radius_ = options.radius;
+}
+
+inheritMethods(playMap.overlays.circleChart, playMap.overlays.canvasOverlay, "superCanvasOverlay");
+
+playMap.overlays.circleChart.prototype.drawCanvas = function() {
+    var that = this;
+    var radius = 50;
+    var text;
+    var width;
+    var height;
+    var canvas = that.canvas_;
     var ctx = canvas.getContext('2d');
+    if(that.radius_) {
+        if(typeof that.radius_ == "function") {
+            radius = Math.floor(that.radius_(that.currentData_));
+            width = 2 * radius;
+            height = 2 * radius;
+        }
+    }
+    // check if text specified
+    if(that.options_.text) {
+        ctx.font = '12px serif';
+        ctx.textBaseline = 'middle';
+        if(typeof that.options_.text == "function") {
+            text = that.options_.text(that.currentData_);
+            var textWidth = ctx.measureText(text).width;
+            width = Math.max(textWidth, width);
+            height = Math.max(12, height);
+        }
+    }
+    // draw the circle
+    // resize canvas
+    canvas.width = width;
+    canvas.height = height;
     // clean the canvas
     ctx.fillStyle = "rgba(255, 255, 255, 0)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, height);
+    // now draw the circle
+    ctx.fillStyle = that.options_.color || "rgba(100, 255, 100, 1)";
     ctx.strokeStyle = "rgba(100, 100, 100, 1)";
-    // draw the barGraph
-    var height = Math.min(value, 150);
-    // add a shadow first
-//    ctx.shadowOffsetX = 2;
-//    ctx.shadowOffsetY = 2;
-//    ctx.shadowBlur = 2;
-//    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-    // now draw the rectangle
-    ctx.fillStyle = "rgba(100, 255, 100, 1)";
-    ctx.fillRect(0, 0, 20, height);
-    ctx.strokeRect(0, 0, 20, height);
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, radius, 0, Math.PI*2, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if(text) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+        ctx.strokeText(text, (width - textWidth) / 2, height / 2);
+    }
 }

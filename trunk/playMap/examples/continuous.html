@@ -8,9 +8,10 @@
     <style type="text/css">
         body { height: 100%; margin: 0px; padding: 10px; }
         #map_canvas { height: 400px; width: 700px; }
-        #options { height: 400px; width: 200px; }
+        #options { height: 400px; width: 300px; }
         #options > div { margin: 10px; padding: 10px; border: 1px grey solid; }
         #options p { margin: 10px 0px; }
+        ul.smallIndent {list-style-position: inside; list-style-type: none; padding: 0px 0px; font-size: 0.9em;}
     </style>
 
     <style>
@@ -49,7 +50,7 @@
       </div>
     </noscript>
 
-    <p>Continuous PlayMap<a href="./discrete.html" target="_top" style="float:right;">Go To Discrete PlayMap</a></p>
+    <p class="ui-widget-header ui-corner-all">Continuous PlayMap<a href="./discrete.html" target="_top" style="float:right;">Go To Discrete PlayMap</a></p>
     <p>This example demonstrates the use of PlayMap with a Continuous player, that is to stay a continuous timed refresh of
         geographical information data, with the possibility to interpolate positions between geometry values and leave a trace.<br>
         Animation can be played back and forth as with a video player.
@@ -61,10 +62,8 @@
             <td>
                 <div id="options">
                     <div><p>Select Example:</p><select id="example"></select></div>
-                    <div><input type="checkbox" id="interpolated"/>Interpolated</div>
-                    <div><input type="checkbox" id="trace"/>With trace</div>
-                    <div><p>Trace size:</p><div id="slider"></div></div>
-                    <div><ul id="entityList"></ul></div>
+                    <div id="entityList">
+                    </div>
                 </div>
             </td>
         </tr>
@@ -166,9 +165,6 @@
             });
             var time = $("#time");
             var repeat = $( "span#repeat" ).buttonset();
-            $( "#slider" ).slider();
-            var trace = $('#trace');
-            var interpolated = $('#interpolated');
 
             map = new google.maps.Map(document.getElementById('map_canvas'), {
                       center: new google.maps.LatLng(0.0, 0.0), //the center lat and long
@@ -244,16 +240,10 @@
                 playMapWidget.setCurrentTime(startTime);
                 playMapWidget.setTimerIncrement(defaultIncrement);
             });
-            interpolated.change(function() {
-                playMapWidget.setDisplayOptions({interpolated: interpolated.is(':checked')});
-            });
-            trace.change(function() {
-                playMapWidget.setDisplayOptions({trace: {on: trace.is(':checked')}});
-            });
             // udpate time label
             playMapWidget.addEventListener(playMap.events.timeChanged,
                 function(timeValue){
-                    time.text(new Date(timeValue).toGMTString())
+                    time.text(new Date(timeValue).toGMTString());
                 });
             function getExample() {
                 return $('#example').find('option:selected').val();
@@ -265,7 +255,7 @@
                 runExample(getExample());
             });
             runExample(getExample());
-            var entityList = $('ul#entityList');
+            var entityList = $('#entityList');
             playMapWidget.addEventListener(playMap.events.dataReady, function() {
                 entityList.empty();
                 var entities = playMapWidget.getEntities();
@@ -273,13 +263,53 @@
                 var entity;
                 for(entityName in entities) {
                     entity = entities[entityName];
-                    var item = $('<li><input type="checkbox" checked="checked" name="' + entityName + '" />' + entityName + '</li>').appendTo(entityList);
-                    item.find('input').change(function() {
-                        var checked = $(this).is(':checked');
-                        var name = $(this).attr("name");
-                        playMapWidget.setEntityVisibility(checked, name);
-                    });
+                    $(
+                        '<h3><a href="#">' + entityName + '</a></h3>' +
+                        '<div><ul class="smallIndent">' +
+                            '<li><input id="visible" type="checkbox" checked="checked" name="' + entityName + '" />Visible</li>' +
+                            '<li><input id="interpolated" type="checkbox" checked="checked" name="' + entityName + '" />Interpolated</li>' +
+                            '<li><input id="trace" type="checkbox" name="' + entityName + '" />With Trace</li>' +
+                            '<li><label>Trace length:</label><label id="traceLength"></label><div id="traceLength" name="' + entityName + '" /></li>' +
+                        '</ul></div>'
+                    ).appendTo(entityList);
+                    playMapWidget.setDisplayOptions({interpolated: true, trace: false}, entityName);
                 }
+                entityList.find('input#visible').change(function() {
+                    var checked = $(this).is(':checked');
+                    var name = $(this).attr("name");
+                    playMapWidget.setEntityVisibility(checked, name);
+                });
+                entityList.find('input#interpolated').change(function() {
+//                    var checked = $(this).is(':checked');
+//                    var name = $(this).attr("name");
+//                    playMapWidget.setDisplayOptions({'interpolated': checked}, name);
+                    var name = $(this).attr("name");
+                    setOptions(name);
+                });
+                entityList.find('input#trace').change(function() {
+//                    var checked = $(this).is(':checked');
+                    var name = $(this).attr("name");
+                    setOptions(name);
+//                    playMapWidget.setDisplayOptions({'trace': {on: checked}}, name);
+                });
+                entityList.find('div#traceLength').slider({
+			min: defaultIncrement / (60 * 1000),
+			max: (playMapWidget.getStopTime() - playMapWidget.getStartTime()) / (60 * 1000),
+			slide: function( event, ui ) {
+                            var name = $(this).attr("name");
+                            $('label#traceLength').text(ui.value + 'mns');
+                            setOptions(name);
+//                            playMapWidget.setDisplayOptions({trace: {length: ui.value * 60 * 1000}}, entityName);
+			}
+                });
+                function setOptions(entityName) {
+                    playMapWidget.setDisplayOptions(
+                    {
+                        'interpolated': $('input#interpolated[name="' + entityName + '"]').is(':checked'),
+                        trace: {on: $('input#trace[name="' + entityName + '"]').is(':checked'), length: $('div#traceLength[name="' + entityName + '"]').slider("value") * 60 * 1000}
+                    }, entityName);
+                }
+                entityList.accordion();
             });
             playMapWidget.addEventListener(playMap.events.endOfData, function() {
                 if($("input#repeat").is(':checked')) {
@@ -288,13 +318,12 @@
             });
     }
 
-    function getOptions() {
-        var trace = $('#trace');
-        var interpolated = $('#interpolated');
+    function getOptions(entityName) {
+        var trace = $('input#trace[name="' + entityName + '"]');
+        var interpolated = $('#interpolated[name="' + entityName + '"]');
         return {
             traces: {on: trace.is(':checked')},
             interpolated: interpolated.is(':checked')
-//            type: {type: "genericMarker", options: {image: '../img/books.png'}}
         };
     }
 
@@ -312,11 +341,11 @@
         query.send(function(response) {
                 var satelliteIcons = {'ENVISAT': '27386', 'LANDSAT 7': '23560', 'SPOT 5': '00000', 'QUIKSCAT': '00000', 'default': '33331'};
                 var entityIndex = 0;
-                var options = getOptions();
+                var options = {}; //getOptions();
                 options.type = {type: "imageOverlay",
                                 options: {
                                     image: function(data) {return ('http://www.n2yo.com/img/icons/' + (satelliteIcons[data[entityIndex]] || satelliteIcons['default']) + '.gif');},
-                                    info: function(data) {return 'Satellite Name: ' + data[entityIndex] + '</br>Altitude: ' + data[1]}
+                                    info: function(data) {return 'Satellite Name: ' + data[entityIndex] + '</br>Position: ' + data[2]}
                                 }};
                 pushFTData(response, 1, 2, 0, options);
             });
@@ -329,11 +358,12 @@
     // displays boats navigating with their traces and their positions interpolated
     // each boat has an icon which indicates its heading
     function runBoatsTraffic() {
-        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Text, Number, Location, Date FROM 420307"));
-        query.send(function(response) {
-                var options = getOptions();
-                pushFTData(response, 3, 2, 0, options);
-            });
+//        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT Text, Number, Location, Date FROM 420307"));
+//        query.send(function(response) {
+//                var options;
+//                pushFTData(response, 3, 2, 0, options);
+//            });
+        alert('Coming soon!');
     }
 
     // displays RT boats traffic with their traces and their positions interpolated
