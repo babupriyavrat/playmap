@@ -7,10 +7,11 @@
     <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/themes/smoothness/jquery-ui.css" type="text/css" media="all" />
     <style type="text/css">
         body { height: 100%; margin: 0px; padding: 10px; }
-        #map_canvas { height: 600px; width: 700px; }
+        #map_canvas { height: 400px; width: 700px; }
         #options { height: 600px; width: 200px; }
         #options > div { margin: 10px; padding: 10px; border: 1px grey solid; }
         #options p { margin: 10px 0px; }
+        table tr td {vertical-align: top;}
     </style>
 
     <style>
@@ -45,47 +46,48 @@
       </div>
     </noscript>
 
-    <p>Discrete PlayMap<a href="./continuous.php" target="_top" style="float:right;">Go To Continuous PlayMap</a></p>
+    <p class="ui-widget-header ui-corner-all">Discrete PlayMap<a href="./continuous.html" target="_top" style="float:right;">Go To Continuous PlayMap</a></p>
     <p>This example demonstrates the use of PlayMap with a Discrete player, that is to stay a date by date display of
         geographical information data.
         You can customise the appearance of your data on the map by specifying display options for each channels or for all.
         You can specify whether the data is loaded at start or for each step
     </p>
 
-    <table>
+    <table id="demotable">
         <tr>
-            <td><div id="map_canvas"></div></td>
+            <td style="width: 700px;">
+                <div id="map_canvas"></div>
+                <div class="demo">
+
+                    <span id="toolbar" class="ui-widget-header ui-corner-all">
+                            <button id="beginning">go to beginning</button>
+                            <button id="back">back</button>
+                            <button id="forward">forward</button>
+                            <button id="end">go to end</button>
+
+                            <select id="time"></select>
+                    </span>
+
+                </div><!-- End demo -->
+
+                <div class="demo-description">
+                    <p>
+                            A mediaplayer toolbar, code from <a href="http://jqueryui.com/demos/button/#toolbar">JQuery UI</a>.
+                            Used to demonstrate the different scenarios possible with PlayMap. The UI could be completely different.
+                            PlayMap does not provide the UI (buttons) but provides the functionality for map animations that can be triggered by a UI.
+                            To implement different UIs check the example code below that provides the UI for this page.
+                    </p>
+                </div><!-- End demo-description -->
+            </td>
             <td>
                 <div id="options">
                     <div><p>Select Example:</p><select id="example"></select></div>
-                    <div><p>Tolerance is a feature allowing you to specify if which data need displaying. Any data within the current date +/- the tolerance is displayed.</p><input type="text" id="tolerance" placeholder="Enter a Duration"/></div>
+<!--                    <div><p>Tolerance is a feature allowing you to specify if which data need displaying. Any data within the current date +/- the tolerance is displayed.</p><input type="text" id="tolerance" placeholder="Enter a Duration"/></div>-->
                     <div><ul id="entityList"></ul></div>
                 </div>
             </td>
         </tr>
     </table>
-
-    <div class="demo">
-
-        <span id="toolbar" class="ui-widget-header ui-corner-all">
-                <button id="beginning">go to beginning</button>
-                <button id="back">back</button>
-                <button id="forward">forward</button>
-                <button id="end">go to end</button>
-
-                <select id="time" />
-        </span>
-
-    </div><!-- End demo -->
-
-<div class="demo-description">
-<p>
-	A mediaplayer toolbar, code from <a href="http://jqueryui.com/demos/button/#toolbar">JQuery UI</a>.
-        Used to demonstrate the different scenarios possible with PlayMap. The UI could be completely different.
-        PlayMap does not provide the UI (buttons) but provides the functionality for map animations that can be triggered by a UI.
-        To implement different UIs check the example code below that provides the UI for this page.
-</p>
-</div><!-- End demo-description -->
 
 <script type="text/javascript">
 
@@ -96,8 +98,9 @@
     var playMapWidget;
 
     var examples = {
-        "Density Bar Chart": runBarChartDensity,
-        "Wikileaks cables": runWikileaksCables
+//        "Density Chart": runChartDensity
+        "World Population %": runPopulationDensity
+//        "Wikileaks cables": runWikileaksCables
     }
 
     $('document').ready(initialize);
@@ -136,7 +139,45 @@
                             primary: "ui-icon-seek-end"
                     }
             });
-            var time = $("#time");
+            var time = $("select#time");
+
+            beginning.click(function() {
+                var options = time.find('option');
+                time.val($(options[0]).val());
+                time.change();
+            });
+
+            end.click(function() {
+                var options = time.find('option');
+                time.val($(options[options.length - 1]).val());
+                time.change();
+            });
+
+            forward.click(function() {
+                var options = time.find('option');
+                var i = 0;
+                for(; i < options.length - 1; i++) {
+                    var item = options[i];
+                    if($(item).is(':selected')) {
+                        time.val($(options[i + 1]).val());
+                        time.change();
+                        return;
+                    }
+                }
+            });
+
+            rewind.click(function() {
+                var options = time.find('option');
+                var i = 1;
+                for(; i < options.length; i++) {
+                    var item = options[i];
+                    if($(item).is(':selected')) {
+                        time.val($(options[i - 1]).val());
+                        time.change();
+                        return;
+                    }
+                }
+            });
 
             function getOptions() {
                 return {
@@ -192,15 +233,16 @@
     }
 
     // displays the bar chart of the US population density
-    function runBarChartDensity() {
+    function runChartDensity() {
         var times = ['7/1/2008', '7/1/2007', '7/1/2006', '7/1/2005', '7/1/2004', '7/1/2003'];
         var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT 'Geographic Area', '" + times.join("', '") + "' FROM 58510"));
         query.send(function(response) {
                 var options = getOptions();
-                options.type = {type: "barChart",
+                options.type = {type: "circleChart",
                                 options: {
+                                    width: '100px',
                                     color: '#faa',
-                                    height: function(data) {return data[3] / 301290332 * 150;}
+                                    radius: function(data) {return Math.min(data[3] / 90129033 * 50, 50);}
                                 }};
                   var numRows = response.getDataTable().getNumberOfRows();
                   var numCols = response.getDataTable().getNumberOfColumns();
@@ -236,6 +278,56 @@
                     });
                   }
             });
+            map.setZoom(2);
+    }
+
+    function runPopulationDensity() {
+        var times = ['2000', '2005', '2010', '2015', '2020', '2025', '2030', '2035', '2040', '2045', '2050'];
+        var query = new google.visualization.Query('http://www.google.com/fusiontables/gvizdata?tq=' + encodeURIComponent("SELECT 'Place', '" + times.join("', '") + "' FROM 435300"));
+        query.send(function(response) {
+                var options = getOptions();
+                options.type = {type: "circleChart",
+                                options: {
+                                    width: '100px',
+                                    color: '#faa',
+                                    text: function(data) {return data[3] + "%";},
+                                    radius: function(data) {return Math.min(data[3] / 100 * 100, 100);}
+                                }};
+                  var numRows = response.getDataTable().getNumberOfRows();
+                  var numCols = response.getDataTable().getNumberOfColumns();
+
+                  var data = [];
+                  var geocodeCounter = numRows;
+                  //create an array of row values
+                  for (i = 0; i < numRows; i++) {
+                    var addressName = response.getDataTable().getValue(i, 0);
+                    var indexValue = i;
+                    geocode(addressName, indexValue, function(results, status, address, index) {
+                        var density, coordinate, time;
+                        geocodeCounter--;
+                        if (status == google.maps.GeocoderStatus.OK) {
+                            coordinate = results[0].geometry.location;
+                            for (j = 1; j < numCols; j++) {
+                                density = response.getDataTable().getValue(index, j);
+                                data.push([address, coordinate, new Date(times[j - 1]), density]);
+                            }
+                            // all data has been geocoded, pushData to the PlayMap widget
+                            if(geocodeCounter == 0) {
+                                playMapWidget.pushData(0, data, 2, 1, options);
+                                // show the discrete time values in the select box
+                                var select = $('select#time');
+                                $.each(times, function(i, item) {
+                                    $('<option value="' + new Date(item).getTime() + '">' + item + '</option>').appendTo(select);
+                                });
+                                select.change(function() {
+                                    playMapWidget.setCurrentTime(select.find('option:selected').val());
+                                });
+                            }
+                        }
+                    });
+                  }
+            });
+            map.setZoom(1);
     }
 
     function geocode(address, index, callback) {
