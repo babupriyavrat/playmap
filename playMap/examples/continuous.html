@@ -121,6 +121,7 @@
 //        "Boat Traffic Replay": runBoatsTraffic
     }
     var defaultIncrement = 60 * 1000;
+    var shift =  75 * 60 * 1000;
 
     $('document').ready(initialize);
 
@@ -221,7 +222,7 @@
             });
             beginning.click(function() {
                 var startTime = playMapWidget.getStartTime();
-                playMapWidget.setCurrentTime(startTime);
+                playMapWidget.setCurrentTime(startTime + shift);
             });
             end.click(function() {
                 var stopTime = playMapWidget.getStopTime();
@@ -237,7 +238,7 @@
                 var startTime = playMapWidget.getStartTime();
                 playMapWidget.pause();
                 playMapWidget.setTimerIncrement(defaultIncrement);
-                playMapWidget.setCurrentTime(startTime);
+                playMapWidget.setCurrentTime(startTime + shift);
                 playMapWidget.setTimerIncrement(defaultIncrement);
             });
             // udpate time label
@@ -280,17 +281,12 @@
                     playMapWidget.setEntityVisibility(checked, name);
                 });
                 entityList.find('input#interpolated').change(function() {
-//                    var checked = $(this).is(':checked');
-//                    var name = $(this).attr("name");
-//                    playMapWidget.setDisplayOptions({'interpolated': checked}, name);
                     var name = $(this).attr("name");
                     setOptions(name);
                 });
                 entityList.find('input#trace').change(function() {
-//                    var checked = $(this).is(':checked');
                     var name = $(this).attr("name");
                     setOptions(name);
-//                    playMapWidget.setDisplayOptions({'trace': {on: checked}}, name);
                 });
                 entityList.find('div#traceLength').slider({
 			min: defaultIncrement / (60 * 1000),
@@ -299,7 +295,6 @@
                             var name = $(this).attr("name");
                             $('label#traceLength').text(ui.value + 'mns');
                             setOptions(name);
-//                            playMapWidget.setDisplayOptions({trace: {length: ui.value * 60 * 1000}}, entityName);
 			}
                 });
                 function setOptions(entityName) {
@@ -313,7 +308,7 @@
             });
             playMapWidget.addEventListener(playMap.events.endOfData, function() {
                 if($("input#repeat").is(':checked')) {
-                    playMapWidget.setCurrentTime(playMapWidget.getStartTime());
+                    playMapWidget.setCurrentTime(playMapWidget.getStartTime() + shift);
                 }
             });
     }
@@ -351,7 +346,7 @@
             });
         map.setZoom(1);
         playMapWidget.addEventListener(playMap.events.dataReady, function() {
-            playMapWidget.setCurrentTime(playMapWidget.getStartTime() + 75 * 60 * 1000);
+            playMapWidget.setCurrentTime(playMapWidget.getStartTime() + shift);
         });
     }
 
