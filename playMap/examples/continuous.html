@@ -1,8 +1,31 @@
+<!--
+
+Copyright (c) 2011 Metaaps SRL(U)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+-->
+
 <html>
   <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 
-    <title>Continuous Play Map Test</title>
+    <title>Play Map - Continuous Example</title>
 
     <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/themes/smoothness/jquery-ui.css" type="text/css" media="all" />
     <style type="text/css">
@@ -62,6 +85,7 @@
             <td>
                 <div id="options">
                     <div><p>Select Example:</p><select id="example"></select></div>
+                    <div><a class="a2a_dd" href="http://www.addtoany.com/share_save"><img src="http://static.addtoany.com/buttons/share_save_171_16.png" width="180" height="16" border="0"  style="margin-top: 10px;" alt="Share/Save/Bookmark"/></a><script type="text/javascript">a2a_linkname=document.title;a2a_linkurl=location.href;</script><script type="text/javascript" src="http://static.addtoany.com/menu/page.js"></script></div>
                     <div id="entityList">
                     </div>
                 </div>
@@ -100,7 +124,7 @@
                 Information is passed to the widget as a table of values, specify which index is the time column, and the geometry column
                 Use pushEntityData to specify data and display Options on an entity by entity level
                 Use pushRawData to create on the fly entities by specifying the entity column in the table
-                You can customise the appearance of your data on the map by specifying display options for each channels or for all.
+                You can customise the appearance of your data on the map by specifying display options for each entities or for all.
             </p>
             </div><!-- End demo-description -->
             </td>
@@ -109,6 +133,8 @@
         </tr>
     </table>
 
+<div class="js-kit-comments" backwards="yes" paginate="10"></div>
+<script src="http://js-kit.com/comments.js"></script>
 
 <script type="text/javascript">
 
@@ -410,6 +436,20 @@
     }
 
 </script>
+
+    <script type="text/javascript">
+
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-11445983-8']);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+
+    </script>
 
   </body>
 </html>
